@@ -1,0 +1,16 @@
+# Built binary
+/gitnotes
+
+# Exported review payloads
+/git-notes.json
+
+# Go test/coverage artifacts
+*.out
+*.test
+coverage.html
+
+# GoReleaser output
+/dist/
+
+# Local secrets (GITHUB_TOKEN for releases)
+.env
