@@ -105,7 +105,7 @@ func TestRenderDetail(t *testing.T) {
 		Submitted: true,
 	})
 	out := buf.String()
-	for _, want := range []string{"Note #3", "main.go:10-12", "Submitted:", "yes", "func main()", "needs a doc comment"} {
+	for _, want := range []string{"Note #4", "main.go:10-12", "Submitted:", "yes", "func main()", "needs a doc comment"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("renderDetail() missing %q in:\n%s", want, out)
 		}

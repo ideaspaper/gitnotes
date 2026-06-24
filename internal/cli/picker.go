@@ -442,7 +442,7 @@ func (a *app) renderDetail(idx int, e note.Entry) {
 		submitted = "yes"
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%s #%d\n", detailLabelStyle.Render("Note"), idx)
+	fmt.Fprintf(&b, "%s #%d\n", detailLabelStyle.Render("Note"), idx+1)
 	fmt.Fprintf(&b, "%s %s\n", detailLabelStyle.Render("Location: "), e.Location().Label())
 	fmt.Fprintf(&b, "%s %s\n", detailLabelStyle.Render("Submitted:"), submitted)
 	if strings.TrimSpace(e.Code) != "" {
