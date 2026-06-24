@@ -8,7 +8,7 @@ Annotate code while you read it, browse your notes in a fuzzy-searchable TUI, an
 
 - 📌 **Line, block, or general notes** — annotate a single line, a range (`file:1-17`), a whole file, or the commit itself.
 - 🧷 **Code capture** — each note snapshots the source at its location, **as of the commit** (falling back to the working tree), so the context travels with the note.
-- 🔍 **Interactive TUI** — `list` opens a **fuzzy-searchable** picker (powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss)) with a live preview; pick a note to see its full detail.
+- 🔍 **Interactive TUI** — `list` opens a **fuzzy-searchable** picker (powered by [Bubble Tea](https://github.com/charmbracelet/bubbletea) + [Lip Gloss](https://github.com/charmbracelet/lipgloss)) with a live preview; pick a note to see its full detail. `edit`, `remove`, and `unsubmit` open the **same picker** when you omit the index, so you never have to look up a note number.
 - 🚀 **Post to PR/MR** — `submit` classifies each note against the PR/MR diff and posts in-diff notes as **line comments** (true multi-line ranges) and the rest as **general comments**, via the `gh` / `glab` CLIs.
 - ✅ **Submit-once tracking** — every posted note is flagged `submitted`, so re-running `submit` skips it and never double-posts. `unsubmit` clears the flag.
 - 🗂️ **Plain, portable storage** — notes are CSV rows in the standard `refs/notes/commits` ref; inspectable with plain `git`, scriptable from any editor.
@@ -57,7 +57,7 @@ gitnotes version
 | `gitnotes export [base] [-o <file>]`                                    | Write the review payload as JSON                               |
 | `gitnotes version`                                                      | Print the version                                              |
 
-> All note commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit, e.g. `gitnotes edit -c <sha> 0 -n "…"`.
+> Commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 0 -n "…"`). This applies to `add`, `list`, `edit`, `remove`, and `unsubmit`; `submit` and `export` always operate on `HEAD`.
 
 ### 📍 Location specs
 
@@ -110,6 +110,17 @@ The `code` column holds the source captured from the file **as of the commit**; 
 Each posted entry is flagged `submitted`, so re-running `submit` skips it (`• … already submitted, skipping`) and only posts new notes — a `--dry-run` never sets the flag, and `unsubmit` clears it.
 
 `submit` auto-detects the platform from the `origin` remote (override with `--github`/`--gitlab`) and shells out to `gh` / `glab`. Use `--dry-run` to print every payload without posting, or `-f <file>` to post a pre-`export`ed JSON. `export` takes an optional `base` argument (default `HEAD^`) for producing a standalone payload.
+
+## 🤖 Claude Code skill
+
+This repo carries a [Claude Code](https://claude.com/claude-code) skill definition at [`.claude/skills/gitnotes/SKILL.md`](.claude/skills/gitnotes/SKILL.md). Install it into your user skills folder so the agent can drive gitnotes while reviewing **any** codebase — recording findings as line-anchored notes, listing/editing them, and submitting to a PR/MR (invoke with `/gitnotes`):
+
+```sh
+mkdir -p ~/.claude/skills
+cp -r .claude/skills/gitnotes ~/.claude/skills/
+```
+
+It teaches the agent the **non-interactive** command forms (explicit index, `-n`, reading notes via `list`/`export`), since an agent has no TTY and the interactive picker needs one.
 
 ## 🪪 License
 
