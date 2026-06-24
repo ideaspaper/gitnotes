@@ -17,14 +17,24 @@ func TestMarkdown(t *testing.T) {
 	for _, want := range []string{
 		"# Review notes (abc1234 — Add cli)",
 		"2 note(s).",
-		"## #0 — `cli.go:3` ✓",
+		"## #1 — `cli.go:3`",
 		"```go\nconst appName = \"gitnotes\"\n```",
-		"## #1 — `(general)` ✗",
+		"## #2 — `(general)`",
 		"overall LGTM",
 	} {
 		if !strings.Contains(md, want) {
 			t.Errorf("Markdown() missing %q in:\n%s", want, md)
 		}
+	}
+
+	if strings.ContainsAny(md, "✓✗") {
+		t.Errorf("Markdown() should not include a submitted marker:\n%s", md)
+	}
+
+	codeAt := strings.Index(md, "```go")
+	noteAt := strings.Index(md, "good")
+	if codeAt < 0 || noteAt < 0 || codeAt > noteAt {
+		t.Errorf("expected code block before the note text; code@%d note@%d", codeAt, noteAt)
 	}
 }
 

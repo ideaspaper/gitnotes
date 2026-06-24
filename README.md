@@ -57,7 +57,7 @@ gitnotes version
 | `gitnotes export [base] [-o <file>] [--format json\|md]`                | Write the review payload as JSON, or the notes as Markdown     |
 | `gitnotes version`                                                      | Print the version                                              |
 
-> Commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 0 -n "…"`). This applies to `add`, `list`, `edit`, `remove`, and `unsubmit`; `submit` and `export` always operate on `HEAD`.
+> Commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 1 -n "…"`). This applies to `add`, `list`, `edit`, `remove`, and `unsubmit`; `submit` and `export` always operate on `HEAD`.
 
 ### 📍 Location specs
 
@@ -75,7 +75,7 @@ gitnotes add -f internal/note/entry.go:20-34 -n "this block needs a doc comment"
 gitnotes add -g -n "overall LGTM, two nits inline"
 gitnotes list                     # fuzzy-search, preview, and inspect notes
 gitnotes edit                     # pick a note interactively, then edit it
-gitnotes remove 0
+gitnotes remove 1
 gitnotes submit 42 --dry-run      # preview every payload without posting
 gitnotes submit 42                # post to PR/MR #42
 ```
@@ -113,22 +113,22 @@ Each posted entry is flagged `submitted`, so re-running `submit` skips it (`• 
 
 ### 📄 Markdown export
 
-`gitnotes export --format md [-o <file>]` writes HEAD's notes as a readable Markdown review (default `git-notes.md`) — one section per note with its location, a `✓`/`✗` submitted marker, the note text, and the captured code in a fenced block:
+`gitnotes export --format md [-o <file>]` writes HEAD's notes as a readable Markdown review (default `git-notes.md`) — one section per note with its location, the captured code in a fenced block, and the note text:
 
 ````markdown
 # Review notes (a1b2c3d — Fix the parser)
 
 2 note(s).
 
-## #0 — `internal/cli/cli.go:14-20` ✗
-
-needs a doc comment here
+## #1 — `internal/cli/cli.go:14-20`
 
 ```go
 const appName = "gitnotes"
 ```
 
-## #1 — `(general)` ✓
+needs a doc comment here
+
+## #2 — `(general)`
 
 overall LGTM
 ````

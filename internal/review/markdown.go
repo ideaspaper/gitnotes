@@ -31,17 +31,13 @@ func Markdown(short, subject string, entries []note.Entry) string {
 
 	fmt.Fprintf(&b, "%d note(s).\n", len(entries))
 	for i, e := range entries {
-		mark := "✗"
-		if e.Submitted {
-			mark = "✓"
-		}
-		fmt.Fprintf(&b, "\n## #%d — `%s` %s\n", i, e.Location().Label(), mark)
-		if body := strings.TrimSpace(e.Note); body != "" {
-			fmt.Fprintf(&b, "\n%s\n", body)
-		}
+		fmt.Fprintf(&b, "\n## #%d — `%s`\n", i+1, e.Location().Label())
 		if code := strings.TrimRight(e.Code, "\n"); strings.TrimSpace(code) != "" {
 			fence := fenceFor(code)
 			fmt.Fprintf(&b, "\n%s%s\n%s\n%s\n", fence, langForFile(e.File), code, fence)
+		}
+		if body := strings.TrimSpace(e.Note); body != "" {
+			fmt.Fprintf(&b, "\n%s\n", body)
 		}
 	}
 	return b.String()

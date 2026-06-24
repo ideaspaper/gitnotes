@@ -82,7 +82,7 @@ func pickRows(entries []note.Entry) ([]pickRow, int) {
 			label:     label,
 			code:      preview(e.Code),
 			note:      preview(e.Note),
-			search:    strings.ToLower(label + " " + e.Note + " " + e.Code),
+			search:    strings.ToLower(fmt.Sprintf("#%d %d %s %s %s", i+1, i+1, label, e.Note, e.Code)),
 		}
 		if w := len([]rune(label)); w > labelW {
 			labelW = w
@@ -297,10 +297,10 @@ func (m pickerModel) renderRow(r pickRow, selected bool) string {
 	note := fmt.Sprintf("%-*s", noteW, truncate(r.note, noteW))
 	glyph := submitGlyph(r.submitted)
 	if selected {
-		line := fmt.Sprintf("%2d  %s  %s  %s  %s", r.idx, label, code, note, glyph)
+		line := fmt.Sprintf("%2d  %s  %s  %s  %s", r.idx+1, label, code, note, glyph)
 		return pickerSelStyle.Render("› " + line)
 	}
-	line := fmt.Sprintf("%2d  %s  %s  %s  %s", r.idx, label, code, note, submitStyle(r.submitted).Render(glyph))
+	line := fmt.Sprintf("%2d  %s  %s  %s  %s", r.idx+1, label, code, note, submitStyle(r.submitted).Render(glyph))
 	return "  " + line
 }
 
@@ -468,6 +468,6 @@ func (a *app) plainList(title string, entries []note.Entry) {
 		label := fmt.Sprintf("%-*s", labelW, truncate(e.Location().Label(), labelW))
 		code := fmt.Sprintf("%-*s", codeWidth, truncate(preview(e.Code), codeWidth))
 		note := fmt.Sprintf("%-*s", noteW, preview(e.Note))
-		fmt.Fprintf(a.out, "%2d  %s  %s  %s  %s\n", i, label, code, note, submitGlyph(e.Submitted))
+		fmt.Fprintf(a.out, "%2d  %s  %s  %s  %s\n", i+1, label, code, note, submitGlyph(e.Submitted))
 	}
 }

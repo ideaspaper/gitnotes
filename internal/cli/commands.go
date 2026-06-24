@@ -119,7 +119,7 @@ func (a *app) newEditCmd() *cobra.Command {
 			newText := strings.TrimSpace(text)
 			if newText == "" {
 				if interactive() {
-					title := fmt.Sprintf("Edit note #%d  %s", idx, entries[idx].Location().Label())
+					title := fmt.Sprintf("Edit note #%d  %s", idx+1, entries[idx].Location().Label())
 					v, canceled, err := a.editText(title, entries[idx].Note)
 					if err != nil {
 						return err
@@ -147,7 +147,7 @@ func (a *app) newEditCmd() *cobra.Command {
 			if err := a.mgr.Write(ctx, commit, entries); err != nil {
 				return err
 			}
-			fmt.Fprintf(a.out, "Updated note #%d on %s.\n", idx, commit)
+			fmt.Fprintf(a.out, "Updated note #%d on %s.\n", idx+1, commit)
 			return nil
 		},
 	}
@@ -199,7 +199,7 @@ func (a *app) newRemoveCmd() *cobra.Command {
 			if len(remaining) == 0 {
 				fmt.Fprintf(a.out, "Removed last note; cleared notes on %s.\n", commit)
 			} else {
-				fmt.Fprintf(a.out, "Removed note #%d from %s.\n", idx, commit)
+				fmt.Fprintf(a.out, "Removed note #%d from %s.\n", idx+1, commit)
 			}
 			return nil
 		},
@@ -352,14 +352,14 @@ func (a *app) newUnsubmitCmd() *cobra.Command {
 				return err
 			}
 			if !entries[idx].Submitted {
-				fmt.Fprintf(a.out, "Note #%d is not marked submitted.\n", idx)
+				fmt.Fprintf(a.out, "Note #%d is not marked submitted.\n", idx+1)
 				return nil
 			}
 			entries[idx].Submitted = false
 			if err := a.mgr.Write(ctx, commit, entries); err != nil {
 				return err
 			}
-			fmt.Fprintf(a.out, "Cleared the submitted flag on note #%d on %s.\n", idx, commit)
+			fmt.Fprintf(a.out, "Cleared the submitted flag on note #%d on %s.\n", idx+1, commit)
 			return nil
 		},
 	}
@@ -379,16 +379,16 @@ func selectIndex(arg string, n int) (int, error) {
 		if n == 1 {
 			return 0, nil
 		}
-		return 0, fmt.Errorf("there are %d notes; specify which by index (0-%d)", n, n-1)
+		return 0, fmt.Errorf("there are %d notes; specify which by number (1-%d)", n, n)
 	}
-	idx, err := strconv.Atoi(arg)
+	num, err := strconv.Atoi(arg)
 	if err != nil {
-		return 0, fmt.Errorf("invalid index %q", arg)
+		return 0, fmt.Errorf("invalid number %q", arg)
 	}
-	if idx < 0 || idx >= n {
-		return 0, fmt.Errorf("index %d out of range (0-%d)", idx, n-1)
+	if num < 1 || num > n {
+		return 0, fmt.Errorf("number %d out of range (1-%d)", num, n)
 	}
-	return idx, nil
+	return num - 1, nil
 }
 
 func preview(s string) string {

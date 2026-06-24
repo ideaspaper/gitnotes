@@ -14,7 +14,7 @@ Notes are stored as CSV rows in `refs/notes/commits`, one per finding: `file,sta
 
 You run without a TTY, so the interactive picker / prompts will hang or error. Always use the **non-interactive** forms:
 
-- **Always pass an explicit index** to `edit`, `remove`, `unsubmit` (never omit it — omitting opens an interactive picker that needs a terminal and errors with "interactive selection needs a terminal").
+- **Always pass an explicit index** to `edit`, `remove`, `unsubmit` — the **1-based** number shown in `list`'s `#` column (never omit it — omitting opens an interactive picker that needs a terminal and errors with "interactive selection needs a terminal").
 - **Always pass `-n "<text>"`** to `add` and `edit` (omitting `-n` makes `edit` wait on stdin).
 - `list` is safe — it auto-detects the non-TTY and prints plain aligned text.
 - To read notes programmatically, prefer `gitnotes list` (plain text: `# / LOCATION / CODE / NOTE / SUBMITTED`) or `gitnotes export -o <file>` then read the JSON.
@@ -45,7 +45,7 @@ If `gitnotes` is missing, tell the user to install it (`brew install ideaspaper/
 4. **Fix mistakes by index** (from the `#` column in `list`):
    ```sh
    gitnotes edit 1 -n "actually prefer log/slog"
-   gitnotes remove 0
+   gitnotes remove 1
    gitnotes remove -a            # clear all notes on the commit
    ```
 5. **Submit to the PR/MR** (preview first):
@@ -86,7 +86,7 @@ Paths are **relative to the repo root**.
 `add`, `list`, `edit`, `remove`, and `unsubmit` act on `HEAD` by default; pass `-c, --commit <commitish>` to target another commit:
 
 ```sh
-gitnotes edit -c <sha> 0 -n "…"
+gitnotes edit -c <sha> 1 -n "…"
 ```
 
 `submit` and `export` always operate on `HEAD` (the `-c` flag does not affect them; `export`'s positional `[base]` is the diff base, not the commit whose notes are read).

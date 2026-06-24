@@ -38,6 +38,22 @@ func TestPickerFuzzyFilter(t *testing.T) {
 	}
 }
 
+func TestFilterByID(t *testing.T) {
+	entries := []note.Entry{
+		{Note: "alpha note"},
+		{Note: "beta note"},
+		{Note: "gamma note"},
+	}
+	m := newPickerModel("", entries)
+
+	for _, id := range []string{"3", "#3"} {
+		got := m.filter(id)
+		if len(got) == 0 || m.rows[got[0]].idx != 2 {
+			t.Errorf("filter(%q) top = %v, want entry idx 2 (note #3)", id, got)
+		}
+	}
+}
+
 func TestFilterMatchesCode(t *testing.T) {
 	entries := []note.Entry{
 		{File: "main.go", StartLine: 5, Note: "entry point", Code: "fmt.Println(\"hi\")"},
