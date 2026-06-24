@@ -1,5 +1,3 @@
-// Package review turns a commit's notes into review comments and posts them to
-// a pull/merge request via the gh / glab CLIs.
 package review
 
 import (
@@ -14,25 +12,21 @@ import (
 	"gitnotes/internal/note"
 )
 
-// Comment is one review comment derived from a note entry.
 type Comment struct {
-	Type      string `json:"type"` // "line" or "general"
+	Type      string `json:"type"`
 	Path      string `json:"path,omitempty"`
-	StartLine int    `json:"start_line,omitempty"` // new-side start; 0 for a single line
-	Line      int    `json:"line,omitempty"`       // new-side anchor line (end of a range)
+	StartLine int    `json:"start_line,omitempty"`
+	Line      int    `json:"line,omitempty"`
 	Side      string `json:"side,omitempty"`
 	InDiff    bool   `json:"in_diff"`
 	Code      string `json:"code,omitempty"`
 	Body      string `json:"body"`
+	Submitted bool   `json:"submitted"`
 
-	// Old-side line positions of the start/end lines, needed to build GitLab
-	// line_range line codes (sha1(path)_<old>_<new>). Zero is a valid value
-	// (e.g. an added line in a new file), so these are always emitted.
 	StartOldLine int `json:"start_old_line"`
 	EndOldLine   int `json:"end_old_line"`
 }
 
-// Payload is the full export for a commit's review.
 type Payload struct {
 	Commit   string    `json:"commit"`
 	Short    string    `json:"short"`
@@ -42,23 +36,17 @@ type Payload struct {
 	Comments []Comment `json:"comments"`
 }
 
-// Builder assembles a Payload from HEAD's notes.
 type Builder struct {
 	git gitcmd.Runner
 	mgr *note.Manager
 }
 
-// NewBuilder returns a Builder.
 func NewBuilder(g gitcmd.Runner, m *note.Manager) *Builder {
 	return &Builder{git: g, mgr: m}
 }
 
-// hunkHeader matches a unified-diff hunk header `@@ -oldStart,oldCount
-// +newStart,newCount @@`, capturing all four numbers (counts may be absent).
 var hunkHeader = regexp.MustCompile(`^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@`)
 
-// Build computes the review payload for HEAD against base (default "HEAD^").
-// base is the PR/MR target ref used to decide each comment's InDiff.
 func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 	if base == "" {
 		base = "HEAD^"
@@ -89,9 +77,6 @@ func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 		return Payload{}, err
 	}
 
-	// Cache the changed-line map per file so each file is diffed once. The map
-	// keys are new-side line numbers in the diff; the value is each line's
-	// old-side position (for GitLab line codes).
 	changedByFile := make(map[string]map[int]int)
 	changed := func(file string) map[int]int {
 		if set, ok := changedByFile[file]; ok {
@@ -105,7 +90,7 @@ func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 	comments := make([]Comment, 0, len(entries))
 	for _, e := range entries {
 		if e.File == "" {
-			comments = append(comments, Comment{Type: "general", Body: e.Note, Code: e.Code})
+			comments = append(comments, Comment{Type: "general", Body: e.Note, Code: e.Code, Submitted: e.Submitted})
 			continue
 		}
 		end := e.EndLine
@@ -113,7 +98,7 @@ func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 			end = e.StartLine
 		}
 		start := 0
-		if e.EndLine > e.StartLine { // a true range; single lines omit start_line
+		if e.EndLine > e.StartLine {
 			start = e.StartLine
 		}
 		set := changed(e.File)
@@ -126,6 +111,7 @@ func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 			InDiff:       rangeInDiff(set, e.StartLine, end),
 			Code:         e.Code,
 			Body:         e.Note,
+			Submitted:    e.Submitted,
 			StartOldLine: set[e.StartLine],
 			EndOldLine:   set[end],
 		})
@@ -141,10 +127,6 @@ func (b *Builder) Build(ctx context.Context, base string) (Payload, error) {
 	}, nil
 }
 
-// changedLines maps each new-side line that base...HEAD changes in file to its
-// old-side position. An added line's old position is `oldStart + oldCount` of
-// its hunk — the old line it follows — which is what GitLab encodes in a line
-// code (sha1(path)_<old>_<new>).
 func (b *Builder) changedLines(ctx context.Context, base, file string) map[int]int {
 	set := make(map[int]int)
 	out, err := b.git.DiffUnified0(ctx, base, file)
@@ -168,7 +150,6 @@ func (b *Builder) changedLines(ctx context.Context, base, file string) map[int]i
 	return set
 }
 
-// countOr1 parses a hunk count group: absent means 1 line, "0" means 0.
 func countOr1(s string) int {
 	if s == "" {
 		return 1
@@ -177,7 +158,6 @@ func countOr1(s string) int {
 	return n
 }
 
-// rangeInDiff reports whether every line in [start, end] is in the changed set.
 func rangeInDiff(changed map[int]int, start, end int) bool {
 	if len(changed) == 0 {
 		return false
@@ -205,7 +185,6 @@ func splitLines(s string) []string {
 	return out
 }
 
-// Export writes the payload as indented JSON to path, overwriting it.
 func Export(p Payload, path string) error {
 	data, err := json.MarshalIndent(p, "", "  ")
 	if err != nil {
@@ -217,7 +196,6 @@ func Export(p Payload, path string) error {
 	return nil
 }
 
-// Load reads a previously exported payload from path.
 func Load(path string) (Payload, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {

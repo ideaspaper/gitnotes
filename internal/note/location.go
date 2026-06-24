@@ -6,12 +6,6 @@ import (
 	"strconv"
 )
 
-// Location identifies what a note is attached to.
-//
-//   - General note:    File == "" (StartLine and EndLine are 0).
-//   - Whole file:      File set, StartLine == 0.
-//   - Single line:     File set, StartLine >= 1, EndLine == 0.
-//   - Line block/range: File set, StartLine >= 1, EndLine >= StartLine.
 type Location struct {
 	File      string
 	StartLine int
@@ -23,13 +17,6 @@ var (
 	singleSpec = regexp.MustCompile(`^(.+):(\d+)$`)
 )
 
-// ParseSpec parses a location spec of the form:
-//
-//	path/to/file.go          -> whole file
-//	path/to/file.go:14       -> single line
-//	path/to/file.go:1-17     -> line block (1 through 17 inclusive)
-//
-// It returns an error for empty input or a malformed/negative range.
 func ParseSpec(spec string) (Location, error) {
 	if spec == "" {
 		return Location{}, fmt.Errorf("empty location")
@@ -58,11 +45,8 @@ func ParseSpec(spec string) (Location, error) {
 	return Location{File: spec}, nil
 }
 
-// IsRange reports whether the location spans more than one line.
 func (l Location) IsRange() bool { return l.EndLine > l.StartLine }
 
-// Label renders the location for display: "file:start-end", "file:line",
-// "file", or "(general)".
 func (l Location) Label() string {
 	switch {
 	case l.File == "":

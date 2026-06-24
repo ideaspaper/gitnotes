@@ -5,14 +5,14 @@ A small Go CLI for managing **git notes** as reviewable, CSV-backed comments on 
 Each commit's note is a CSV document with one row per entry:
 
 ```
-file,startLine,endLine,code,note
+file,startLine,endLine,code,note,submitted
 ```
 
-- `pkg/config/config.go:1-17` → `pkg/config/config.go,1,17,<captured code>,<note>`
-- `pkg/config/config.go:14` → `pkg/config/config.go,14,,<captured code>,<note>`
-- a general note → `,,,,<note>`
+- `pkg/config/config.go:1-17` → `pkg/config/config.go,1,17,<captured code>,<note>,`
+- `pkg/config/config.go:14` → `pkg/config/config.go,14,,<captured code>,<note>,`
+- a general note → `,,,,<note>,`
 
-The `code` column holds the source captured from the file **as of the commit** (falling back to the working tree). Multi-line code is CSV-quoted, so it round-trips losslessly. Notes live in the standard `refs/notes/commits` ref.
+The `code` column holds the source captured from the file **as of the commit** (falling back to the working tree). Multi-line code is CSV-quoted, so it round-trips losslessly. The `submitted` column is `true` once the entry has been posted to a PR/MR, so re-running `submit` skips it and never posts the same comment twice. Notes live in the standard `refs/notes/commits` ref.
 
 ## Install
 
@@ -79,5 +79,7 @@ gitnotes submit 42                # post to PR/MR #42
 
   the note text
   ```
+
+Each entry whose comment is posted is flagged `submitted` in the note, so running `submit` again skips it (`• … already submitted, skipping`) and only posts new notes — a `--dry-run` never sets the flag.
 
 `submit` posts directly — no file needed — auto-detecting the platform from the `origin` remote (override with `--github`/`--gitlab`). It shells out to the [`gh`](https://cli.github.com/) (GitHub) or [`glab`](https://gitlab.com/gitlab-org/cli) (GitLab) CLI, so those must be installed and authenticated. Use `--dry-run` to print every payload without posting, or `-f <file>` to post a pre-`export`ed JSON. `export` keeps an optional `base` argument (default `HEAD^`) for producing a standalone payload.

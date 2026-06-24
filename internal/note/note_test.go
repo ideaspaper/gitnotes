@@ -77,13 +77,12 @@ func TestMarshalRoundTrip(t *testing.T) {
 }
 
 func TestUnmarshalRejectsNonCSV(t *testing.T) {
-	// A hand-written one-field note is not the 5-column format.
+
 	if _, err := Unmarshal("just a plain note\n"); err == nil {
 		t.Fatal("expected error for non-CSV note")
 	}
 }
 
-// fakeGit serves a fixed file body and records nothing else.
 type fakeGit struct{ body string }
 
 func (f fakeGit) ReadNote(context.Context, string) (string, bool) { return "", false }

@@ -12,9 +12,9 @@ import (
 	"strings"
 
 	"gitnotes/internal/gitcmd"
+	"gitnotes/internal/note"
 )
 
-// Platform is a code-review host.
 type Platform string
 
 const (
@@ -22,28 +22,22 @@ const (
 	GitLab Platform = "gitlab"
 )
 
-// Options controls a Submit run.
 type Options struct {
-	Number   string   // PR/MR number — required
-	Platform Platform // empty = detect from the origin remote
+	Number   string
+	Platform Platform
 	DryRun   bool
 }
 
-// Submitter posts a commit's notes to a PR/MR via the gh / glab CLIs. It owns a
-// Builder so it can derive the diff base from the PR/MR itself.
 type Submitter struct {
 	git     gitcmd.Runner
+	mgr     *note.Manager
 	builder *Builder
 }
 
-// NewSubmitter returns a Submitter.
-func NewSubmitter(g gitcmd.Runner, b *Builder) *Submitter {
-	return &Submitter{git: g, builder: b}
+func NewSubmitter(g gitcmd.Runner, m *note.Manager, b *Builder) *Submitter {
+	return &Submitter{git: g, mgr: m, builder: b}
 }
 
-// Submit computes HEAD's notes and posts them to the PR/MR named by opts.Number.
-// The diff base is taken from the PR/MR (GitHub's base branch, GitLab's
-// diff_refs.base_sha), so in-diff classification matches the actual review.
 func (s *Submitter) Submit(ctx context.Context, opts Options) error {
 	platform, err := s.platform(ctx, opts)
 	if err != nil {
@@ -59,8 +53,6 @@ func (s *Submitter) Submit(ctx context.Context, opts Options) error {
 	}
 }
 
-// SubmitPayload posts a pre-exported payload as-is (its in_diff flags and base
-// SHAs are trusted), without recomputing against the PR/MR base.
 func (s *Submitter) SubmitPayload(ctx context.Context, p Payload, opts Options) error {
 	platform, err := s.platform(ctx, opts)
 	if err != nil {
@@ -72,16 +64,17 @@ func (s *Submitter) SubmitPayload(ctx context.Context, p Payload, opts Options) 
 	}
 	switch platform {
 	case GitHub:
-		return s.postGitHub(ctx, p, opts.Number, p.Commit, opts.DryRun)
+		s.postGitHub(ctx, p, opts.Number, p.Commit, opts.DryRun)
+		return nil
 	case GitLab:
 		refs := diffRefs{BaseSHA: p.BaseSHA, StartSHA: p.BaseSHA, HeadSHA: p.Commit}
-		return s.postGitLab(ctx, p, opts.Number, refs, opts.DryRun)
+		s.postGitLab(ctx, p, opts.Number, refs, opts.DryRun)
+		return nil
 	default:
 		return fmt.Errorf("unknown platform %q", platform)
 	}
 }
 
-// platform resolves the target platform from opts or the origin remote.
 func (s *Submitter) platform(ctx context.Context, opts Options) (Platform, error) {
 	if opts.Platform != "" {
 		return opts.Platform, nil
@@ -108,7 +101,9 @@ func (s *Submitter) submitGitHub(ctx context.Context, opts Options) error {
 	if commitID == "" {
 		commitID = p.Commit
 	}
-	return s.postGitHub(ctx, p, number, commitID, opts.DryRun)
+	posted := s.postGitHub(ctx, p, number, commitID, opts.DryRun)
+	s.flagSubmitted(ctx, p.Commit, posted, opts.DryRun)
+	return nil
 }
 
 func (s *Submitter) submitGitLab(ctx context.Context, opts Options) error {
@@ -125,14 +120,38 @@ func (s *Submitter) submitGitLab(ctx context.Context, opts Options) error {
 	if err != nil {
 		return err
 	}
-	if refErr != nil { // dry-run fallback when glab is unavailable
+	if refErr != nil {
 		refs = diffRefs{BaseSHA: p.BaseSHA, StartSHA: p.BaseSHA, HeadSHA: p.Commit}
 	}
-	return s.postGitLab(ctx, p, opts.Number, refs, opts.DryRun)
+	posted := s.postGitLab(ctx, p, opts.Number, refs, opts.DryRun)
+	s.flagSubmitted(ctx, p.Commit, posted, opts.DryRun)
+	return nil
 }
 
-// resolveBaseRef turns a PR base branch name into a local diff base, preferring
-// the remote-tracking ref. Falls back to HEAD^ when nothing resolves.
+func (s *Submitter) flagSubmitted(ctx context.Context, commit string, posted []int, dryRun bool) {
+	if dryRun || len(posted) == 0 {
+		return
+	}
+	entries, err := s.mgr.Read(ctx, commit)
+	if err != nil {
+		fmt.Printf("  ! posted, but could not read notes to mark them submitted: %v\n", err)
+		return
+	}
+	changed := false
+	for _, idx := range posted {
+		if idx >= 0 && idx < len(entries) && !entries[idx].Submitted {
+			entries[idx].Submitted = true
+			changed = true
+		}
+	}
+	if !changed {
+		return
+	}
+	if err := s.mgr.Write(ctx, commit, entries); err != nil {
+		fmt.Printf("  ! posted, but could not mark notes submitted: %v\n", err)
+	}
+}
+
 func (s *Submitter) resolveBaseRef(ctx context.Context, branch string) string {
 	if branch != "" {
 		for _, ref := range []string{"origin/" + branch, branch} {
@@ -144,7 +163,6 @@ func (s *Submitter) resolveBaseRef(ctx context.Context, branch string) string {
 	return "HEAD^"
 }
 
-// detectPlatform sniffs the origin remote host.
 func (s *Submitter) detectPlatform(ctx context.Context) (Platform, error) {
 	url, err := s.git.RemoteURL(ctx, "origin")
 	if err != nil {
@@ -161,9 +179,7 @@ func (s *Submitter) detectPlatform(ctx context.Context) (Platform, error) {
 	}
 }
 
-// --- posting ------------------------------------------------------------------
-
-func (s *Submitter) postGitHub(ctx context.Context, p Payload, number, commitID string, dryRun bool) error {
+func (s *Submitter) postGitHub(ctx context.Context, p Payload, number, commitID string, dryRun bool) []int {
 	if len(p.Comments) == 0 {
 		fmt.Println("No notes to submit.")
 		return nil
@@ -174,7 +190,14 @@ func (s *Submitter) postGitHub(ctx context.Context, p Payload, number, commitID 
 	}
 	fmt.Printf("GitHub PR #%s%s\n", number, dryTag)
 
-	for _, c := range p.Comments {
+	var posted []int
+	attempted := 0
+	for i, c := range p.Comments {
+		if c.Submitted {
+			fmt.Printf("  • %s (already submitted, skipping)\n", commentLabel(c))
+			continue
+		}
+		attempted++
 		if c.Type == "line" && c.InDiff {
 			body := map[string]any{
 				"body":      c.Body,
@@ -187,16 +210,23 @@ func (s *Submitter) postGitHub(ctx context.Context, p Payload, number, commitID 
 				body["start_line"] = c.StartLine
 				body["start_side"] = "RIGHT"
 			}
-			apiPost(ctx, "gh", fmt.Sprintf("repos/{owner}/{repo}/pulls/%s/comments", number), body, "line "+lineLabel(c), dryRun)
+			if apiPost(ctx, "gh", fmt.Sprintf("repos/{owner}/{repo}/pulls/%s/comments", number), body, "line "+lineLabel(c), dryRun) {
+				posted = append(posted, i)
+			}
 			continue
 		}
-		apiPost(ctx, "gh", fmt.Sprintf("repos/{owner}/{repo}/issues/%s/comments", number),
-			map[string]any{"body": generalBody(c)}, generalLabel(c), dryRun)
+		if apiPost(ctx, "gh", fmt.Sprintf("repos/{owner}/{repo}/issues/%s/comments", number),
+			map[string]any{"body": generalBody(c)}, generalLabel(c), dryRun) {
+			posted = append(posted, i)
+		}
 	}
-	return nil
+	if attempted == 0 {
+		fmt.Println("  All notes were already submitted; nothing to post.")
+	}
+	return posted
 }
 
-func (s *Submitter) postGitLab(ctx context.Context, p Payload, iid string, refs diffRefs, dryRun bool) error {
+func (s *Submitter) postGitLab(ctx context.Context, p Payload, iid string, refs diffRefs, dryRun bool) []int {
 	if len(p.Comments) == 0 {
 		fmt.Println("No notes to submit.")
 		return nil
@@ -207,7 +237,14 @@ func (s *Submitter) postGitLab(ctx context.Context, p Payload, iid string, refs 
 	}
 	fmt.Printf("GitLab MR !%s%s\n", iid, dryTag)
 
-	for _, c := range p.Comments {
+	var posted []int
+	attempted := 0
+	for i, c := range p.Comments {
+		if c.Submitted {
+			fmt.Printf("  • %s (already submitted, skipping)\n", commentLabel(c))
+			continue
+		}
+		attempted++
 		if c.Type == "line" && c.InDiff {
 			position := map[string]any{
 				"position_type": "text",
@@ -218,30 +255,41 @@ func (s *Submitter) postGitLab(ctx context.Context, p Payload, iid string, refs 
 				"old_path":      c.Path,
 				"new_line":      c.Line,
 			}
-			if c.StartLine > 0 && c.StartLine < c.Line { // multi-line range
+			if c.StartLine > 0 && c.StartLine < c.Line {
 				position["line_range"] = map[string]any{
 					"start": map[string]any{"line_code": gitlabLineCode(c.Path, c.StartOldLine, c.StartLine), "type": "new"},
 					"end":   map[string]any{"line_code": gitlabLineCode(c.Path, c.EndOldLine, c.Line), "type": "new"},
 				}
 			}
-			apiPost(ctx, "glab", fmt.Sprintf("projects/:id/merge_requests/%s/discussions", iid),
-				map[string]any{"body": c.Body, "position": position}, "line "+lineLabel(c), dryRun)
+			if apiPost(ctx, "glab", fmt.Sprintf("projects/:id/merge_requests/%s/discussions", iid),
+				map[string]any{"body": c.Body, "position": position}, "line "+lineLabel(c), dryRun) {
+				posted = append(posted, i)
+			}
 			continue
 		}
-		apiPost(ctx, "glab", fmt.Sprintf("projects/:id/merge_requests/%s/notes", iid),
-			map[string]any{"body": generalBody(c)}, generalLabel(c), dryRun)
+		if apiPost(ctx, "glab", fmt.Sprintf("projects/:id/merge_requests/%s/notes", iid),
+			map[string]any{"body": generalBody(c)}, generalLabel(c), dryRun) {
+			posted = append(posted, i)
+		}
 	}
-	return nil
+	if attempted == 0 {
+		fmt.Println("  All notes were already submitted; nothing to post.")
+	}
+	return posted
 }
 
-// gitlabLineCode builds a GitLab diff line code: the SHA-1 of the file path,
-// then the old-side and new-side line numbers, joined by underscores.
+func commentLabel(c Comment) string {
+	if c.Type == "line" && c.InDiff {
+		return "line " + lineLabel(c)
+	}
+	return generalLabel(c)
+}
+
 func gitlabLineCode(path string, oldLine, newLine int) string {
 	sum := sha1.Sum([]byte(path))
 	return fmt.Sprintf("%s_%d_%d", hex.EncodeToString(sum[:]), oldLine, newLine)
 }
 
-// lineLabel renders a line comment's location ("path:line" or "path:start-end").
 func lineLabel(c Comment) string {
 	if c.StartLine > 0 && c.StartLine < c.Line {
 		return fmt.Sprintf("%s:%d-%d", c.Path, c.StartLine, c.Line)
@@ -249,7 +297,6 @@ func lineLabel(c Comment) string {
 	return fmt.Sprintf("%s:%d", c.Path, c.Line)
 }
 
-// generalLabel describes a comment for the progress line.
 func generalLabel(c Comment) string {
 	if c.Type == "line" {
 		return fmt.Sprintf("general (%s outside diff)", lineLabel(c))
@@ -257,12 +304,6 @@ func generalLabel(c Comment) string {
 	return "general"
 }
 
-// generalBody is the body posted for a general comment. A line note that fell
-// outside the diff is rendered as its location, a blank line, then the note:
-//
-//	path/to/file.go:10-14
-//
-//	the note text
 func generalBody(c Comment) string {
 	if c.Type == "line" {
 		return fmt.Sprintf("%s\n\n%s", lineLabel(c), c.Body)
@@ -270,29 +311,25 @@ func generalBody(c Comment) string {
 	return c.Body
 }
 
-// apiPost POSTs payload to endpoint through the gh/glab `api` command, or prints
-// it under dry-run.
-func apiPost(ctx context.Context, tool, endpoint string, payload map[string]any, label string, dryRun bool) {
+func apiPost(ctx context.Context, tool, endpoint string, payload map[string]any, label string, dryRun bool) bool {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		fmt.Printf("  ✗ %s: encoding payload: %v\n", label, err)
-		return
+		return false
 	}
 	if dryRun {
 		fmt.Printf("  [dry-run] %s  →  POST %s\n", label, endpoint)
 		fmt.Printf("            %s\n", data)
-		return
+		return true
 	}
-	// glab does not set a JSON content type for --input bodies (GitLab then
-	// answers 415); gh already does, but the explicit header is harmless there.
+
 	if _, err := runTool(ctx, tool, string(data), "api", "--method", "POST", endpoint, "--input", "-", "-H", "Content-Type: application/json"); err != nil {
 		fmt.Printf("  ✗ %s: %v\n", label, err)
-		return
+		return false
 	}
 	fmt.Printf("  ✓ %s\n", label)
+	return true
 }
-
-// --- gh / glab helpers --------------------------------------------------------
 
 type jsonNumber int
 
@@ -336,7 +373,6 @@ func glabDiffRefs(ctx context.Context, iid string) (diffRefs, error) {
 	return v.DiffRefs, nil
 }
 
-// runTool executes an external CLI (gh/glab), optionally feeding stdin.
 func runTool(ctx context.Context, tool, stdin string, args ...string) (string, error) {
 	if _, err := exec.LookPath(tool); err != nil {
 		return "", fmt.Errorf("%s is not installed", tool)

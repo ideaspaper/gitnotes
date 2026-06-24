@@ -1,5 +1,3 @@
-// Command gitnotes manages git notes as reviewable, CSV-backed comments on
-// HEAD, and posts them as pull/merge-request review comments.
 package main
 
 import (

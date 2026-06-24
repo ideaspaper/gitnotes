@@ -26,8 +26,7 @@ func TestRangeInDiff(t *testing.T) {
 }
 
 func TestHunkHeaderParsing(t *testing.T) {
-	// Groups: 1=oldStart, 2=oldCount, 3=newStart, 4=newCount.
-	// oldPos of an added line = oldStart + oldCount.
+
 	cases := []struct {
 		line                       string
 		match                      bool
@@ -35,9 +34,9 @@ func TestHunkHeaderParsing(t *testing.T) {
 		newStart, newCount, oldPos int
 	}{
 		{"@@ -1,3 +4,2 @@ func foo() {", true, 1, 3, 4, 2, 4},
-		{"@@ -0,0 +1,234 @@", true, 0, 0, 1, 234, 0},  // new file: added lines map to old 0
-		{"@@ -10,2 +10,3 @@", true, 10, 2, 10, 3, 12}, // replacement
-		{"@@ -5 +5 @@", true, 5, 1, 5, 1, 6},          // counts omitted -> 1
+		{"@@ -0,0 +1,234 @@", true, 0, 0, 1, 234, 0},
+		{"@@ -10,2 +10,3 @@", true, 10, 2, 10, 3, 12},
+		{"@@ -5 +5 @@", true, 5, 1, 5, 1, 6},
 		{" not a hunk header", false, 0, 0, 0, 0, 0},
 	}
 	for _, c := range cases {
@@ -64,8 +63,7 @@ func TestHunkHeaderParsing(t *testing.T) {
 }
 
 func TestGitlabLineCode(t *testing.T) {
-	// sha1("detail.html") = bec3a43b20c5774df06ec073999a42d38ab7231a (verified
-	// against a real GitLab line_range that the API accepted).
+
 	got := gitlabLineCode("detail.html", 0, 3)
 	want := "bec3a43b20c5774df06ec073999a42d38ab7231a_0_3"
 	if got != want {
