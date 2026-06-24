@@ -55,6 +55,7 @@ func (a *app) newRootCmd() *cobra.Command {
 		a.newRemoveCmd(),
 		a.newExportCmd(),
 		a.newSubmitCmd(),
+		a.newUnsubmitCmd(),
 		a.newVersionCmd(),
 	)
 	return root

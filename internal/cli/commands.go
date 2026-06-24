@@ -2,13 +2,12 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 
 	"gitnotes/internal/note"
@@ -82,9 +81,7 @@ func (a *app) newListCmd() *cobra.Command {
 				return nil
 			}
 			subject, _ := a.git.Subject(ctx, commit)
-			fmt.Fprintf(a.out, "%s  %s\n", commit, subject)
-			a.renderEntries(entries)
-			return nil
+			return a.browseEntries(fmt.Sprintf("%s  %s", commit, subject), entries)
 		},
 	}
 }
@@ -110,17 +107,35 @@ func (a *app) newEditCmd() *cobra.Command {
 				return nil
 			}
 
-			idx, err := selectIndex(firstArg(args), len(entries))
+			idx, err := a.chooseIndex("Select a note to edit", args, entries)
+			if errors.Is(err, errPickCanceled) {
+				fmt.Fprintln(a.out, "Canceled.")
+				return nil
+			}
 			if err != nil {
 				return err
 			}
 
 			newText := strings.TrimSpace(text)
 			if newText == "" {
-				fmt.Fprintf(a.out, "Current: %s\n", entries[idx].Note)
-				newText, err = prompt("New note (blank = keep): ")
-				if err != nil {
-					return err
+				if interactive() {
+					title := fmt.Sprintf("Edit note #%d  %s", idx, entries[idx].Location().Label())
+					v, canceled, err := a.editText(title, entries[idx].Note)
+					if err != nil {
+						return err
+					}
+					if canceled {
+						fmt.Fprintln(a.out, "Unchanged.")
+						return nil
+					}
+					newText = strings.TrimSpace(v)
+				} else {
+					fmt.Fprintf(a.out, "Current: %s\n", entries[idx].Note)
+					v, err := prompt("New note (blank = keep): ")
+					if err != nil {
+						return err
+					}
+					newText = strings.TrimSpace(v)
 				}
 				if newText == "" {
 					fmt.Fprintln(a.out, "Unchanged.")
@@ -169,7 +184,11 @@ func (a *app) newRemoveCmd() *cobra.Command {
 				return nil
 			}
 
-			idx, err := selectIndex(firstArg(args), len(entries))
+			idx, err := a.chooseIndex("Select a note to remove", args, entries)
+			if errors.Is(err, errPickCanceled) {
+				fmt.Fprintln(a.out, "Canceled.")
+				return nil
+			}
 			if err != nil {
 				return err
 			}
@@ -255,6 +274,70 @@ func (a *app) newSubmitCmd() *cobra.Command {
 	return cmd
 }
 
+func (a *app) newUnsubmitCmd() *cobra.Command {
+	var all bool
+	cmd := &cobra.Command{
+		Use:   "unsubmit [index]",
+		Short: "Clear a note's submitted flag so submit posts it again (or all with -a; omit index for an interactive picker)",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			commit, err := a.head(ctx)
+			if err != nil {
+				return err
+			}
+			entries, err := a.mgr.Read(ctx, commit)
+			if err != nil {
+				return err
+			}
+			if len(entries) == 0 {
+				fmt.Fprintf(a.out, "No git notes on %s.\n", commit)
+				return nil
+			}
+
+			if all {
+				cleared := 0
+				for i := range entries {
+					if entries[i].Submitted {
+						entries[i].Submitted = false
+						cleared++
+					}
+				}
+				if cleared == 0 {
+					fmt.Fprintln(a.out, "No submitted notes to clear.")
+					return nil
+				}
+				if err := a.mgr.Write(ctx, commit, entries); err != nil {
+					return err
+				}
+				fmt.Fprintf(a.out, "Cleared the submitted flag on %d note(s) on %s.\n", cleared, commit)
+				return nil
+			}
+
+			idx, err := a.chooseIndex("Select a note to mark not submitted", args, entries)
+			if errors.Is(err, errPickCanceled) {
+				fmt.Fprintln(a.out, "Canceled.")
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if !entries[idx].Submitted {
+				fmt.Fprintf(a.out, "Note #%d is not marked submitted.\n", idx)
+				return nil
+			}
+			entries[idx].Submitted = false
+			if err := a.mgr.Write(ctx, commit, entries); err != nil {
+				return err
+			}
+			fmt.Fprintf(a.out, "Cleared the submitted flag on note #%d on %s.\n", idx, commit)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "clear the submitted flag on all notes")
+	return cmd
+}
+
 func firstArg(args []string) string {
 	if len(args) == 0 {
 		return ""
@@ -277,40 +360,6 @@ func selectIndex(arg string, n int) (int, error) {
 		return 0, fmt.Errorf("index %d out of range (0-%d)", idx, n-1)
 	}
 	return idx, nil
-}
-
-var (
-	headerStyle    = lipgloss.NewStyle().Bold(true).Padding(0, 1)
-	cellStyle      = lipgloss.NewStyle().Padding(0, 1)
-	submittedStyle = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("2"))
-)
-
-func (a *app) renderEntries(entries []note.Entry) {
-	t := table.New().
-		Border(lipgloss.NormalBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("240"))).
-		Headers("#", "LOCATION", "CODE", "NOTE", "SUBMITTED").
-		StyleFunc(func(row, col int) lipgloss.Style {
-			switch {
-			case row == table.HeaderRow:
-				return headerStyle
-			case col == 4:
-				return submittedStyle
-			default:
-				return cellStyle
-			}
-		})
-	for i, e := range entries {
-		t.Row(strconv.Itoa(i), e.Location().Label(), preview(e.Code), preview(e.Note), submittedMark(e.Submitted))
-	}
-	fmt.Fprintln(a.out, t.Render())
-}
-
-func submittedMark(submitted bool) string {
-	if submitted {
-		return "✓"
-	}
-	return ""
 }
 
 func preview(s string) string {

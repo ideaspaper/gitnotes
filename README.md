@@ -38,11 +38,12 @@ Posting to a PR/MR additionally needs the [`gh`](https://cli.github.com/) (GitHu
 ```
 gitnotes add -f <file[:line]|file[:start-end]> -n <note>                Add a line / block note
 gitnotes add -g -n <note>                                               Add a general note
-gitnotes list                                                           List HEAD's notes
-gitnotes edit [index] [-n <note>]                                       Edit a note's text
+gitnotes list                                                           List HEAD's notes (interactive, fuzzy-searchable; select one to see its detail; plain text when piped)
+gitnotes edit [index] [-n <note>]                                       Edit a note's text (omit index for an interactive fuzzy picker)
 gitnotes remove [index] | -a                                            Remove one note (or all)
 gitnotes export [base] [-o <file>]                                      Write the review payload as JSON
 gitnotes submit <number> [--github|--gitlab] [-f <file>] [--dry-run]    Post notes to PR/MR <number>
+gitnotes unsubmit [index] | -a                                          Clear a note's submitted flag so submit posts it again (omit index for an interactive picker)
 gitnotes version                                                        Print the version
 ```
 
