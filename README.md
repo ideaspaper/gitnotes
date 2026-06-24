@@ -47,6 +47,8 @@ gitnotes unsubmit [index] | -a                                          Clear a 
 gitnotes version                                                        Print the version
 ```
 
+All note commands act on `HEAD` by default; pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 0 -n "…"`).
+
 ### Location specs
 
 | spec                   | meaning                           |

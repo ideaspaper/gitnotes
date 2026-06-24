@@ -16,9 +16,10 @@ const appName = "gitnotes"
 var Version = "dev"
 
 type app struct {
-	git gitcmd.Runner
-	mgr *note.Manager
-	out io.Writer
+	git    gitcmd.Runner
+	mgr    *note.Manager
+	out    io.Writer
+	commit string
 }
 
 func Run(ctx context.Context, out io.Writer, args []string) error {
@@ -48,6 +49,7 @@ func (a *app) newRootCmd() *cobra.Command {
 		},
 	}
 	root.SetVersionTemplate(fmt.Sprintf("%s {{.Version}}\n", appName))
+	root.PersistentFlags().StringVarP(&a.commit, "commit", "c", "", "operate on this commit instead of HEAD")
 	root.AddCommand(
 		a.newAddCmd(),
 		a.newListCmd(),
@@ -75,7 +77,11 @@ func (a *app) ensureRepo(ctx context.Context) error {
 }
 
 func (a *app) head(ctx context.Context) (string, error) {
-	return a.git.ShortHash(ctx, "HEAD")
+	ref := "HEAD"
+	if a.commit != "" {
+		ref = a.commit
+	}
+	return a.git.ShortHash(ctx, ref)
 }
 
 func (a *app) newVersionCmd() *cobra.Command {
