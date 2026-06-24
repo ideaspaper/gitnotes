@@ -54,7 +54,7 @@ gitnotes version
 | `gitnotes remove [index] \| -a`                                         | Remove one note (or all with `-a`)                             |
 | `gitnotes submit <number> [--github\|--gitlab] [-f <file>] [--dry-run]` | Post notes to PR/MR `<number>`                                 |
 | `gitnotes unsubmit [index] \| -a`                                       | Clear a note's `submitted` flag so `submit` posts it again     |
-| `gitnotes export [base] [-o <file>]`                                    | Write the review payload as JSON                               |
+| `gitnotes export [base] [-o <file>] [--format json\|md]`                | Write the review payload as JSON, or the notes as Markdown     |
 | `gitnotes version`                                                      | Print the version                                              |
 
 > Commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 0 -n "…"`). This applies to `add`, `list`, `edit`, `remove`, and `unsubmit`; `submit` and `export` always operate on `HEAD`.
@@ -110,6 +110,28 @@ The `code` column holds the source captured from the file **as of the commit**; 
 Each posted entry is flagged `submitted`, so re-running `submit` skips it (`• … already submitted, skipping`) and only posts new notes — a `--dry-run` never sets the flag, and `unsubmit` clears it.
 
 `submit` auto-detects the platform from the `origin` remote (override with `--github`/`--gitlab`) and shells out to `gh` / `glab`. Use `--dry-run` to print every payload without posting, or `-f <file>` to post a pre-`export`ed JSON. `export` takes an optional `base` argument (default `HEAD^`) for producing a standalone payload.
+
+### 📄 Markdown export
+
+`gitnotes export --format md [-o <file>]` writes HEAD's notes as a readable Markdown review (default `git-notes.md`) — one section per note with its location, a `✓`/`✗` submitted marker, the note text, and the captured code in a fenced block:
+
+````markdown
+# Review notes (a1b2c3d — Fix the parser)
+
+2 note(s).
+
+## #0 — `internal/cli/cli.go:14-20` ✗
+
+needs a doc comment here
+
+```go
+const appName = "gitnotes"
+```
+
+## #1 — `(general)` ✓
+
+overall LGTM
+````
 
 ## 🤖 Claude Code skill
 

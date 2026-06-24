@@ -58,21 +58,23 @@ If `gitnotes` is missing, tell the user to install it (`brew install ideaspaper/
 
 ## Command reference (non-interactive subset)
 
-| Command | Purpose |
-| ------- | ------- |
-| `gitnotes add -f <file>:<line>          -n "<note>"` | Add a single-line note |
-| `gitnotes add -f <file>:<start>-<end>   -n "<note>"` | Add a block/range note |
-| `gitnotes add -f <file>                 -n "<note>"` | Whole-file note (no code captured) |
-| `gitnotes add -g                        -n "<note>"` | General commit-level note |
-| `gitnotes list` | List notes (plain text when non-TTY) |
-| `gitnotes edit <index> -n "<note>"` | Replace a note's text |
-| `gitnotes remove <index>` / `gitnotes remove -a` | Remove one note / all |
-| `gitnotes unsubmit <index>` / `gitnotes unsubmit -a` | Clear the `submitted` flag |
-| `gitnotes export [base] -o <file>` | Write the review payload as JSON |
-| `gitnotes submit <number> [--github\|--gitlab] [--dry-run]` | Post notes to PR/MR `<number>` |
-| `gitnotes version` | Print the version |
+| Command                                                     | Purpose                                                                                   |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `gitnotes add -f <file>:<line>          -n "<note>"`        | Add a single-line note                                                                    |
+| `gitnotes add -f <file>:<start>-<end>   -n "<note>"`        | Add a block/range note                                                                    |
+| `gitnotes add -f <file>                 -n "<note>"`        | Whole-file note (no code captured)                                                        |
+| `gitnotes add -g                        -n "<note>"`        | General commit-level note                                                                 |
+| `gitnotes list`                                             | List notes (plain text when non-TTY)                                                      |
+| `gitnotes edit <index> -n "<note>"`                         | Replace a note's text                                                                     |
+| `gitnotes remove <index>` / `gitnotes remove -a`            | Remove one note / all                                                                     |
+| `gitnotes unsubmit <index>` / `gitnotes unsubmit -a`        | Clear the `submitted` flag                                                                |
+| `gitnotes export [base] -o <file>`                          | Write the review payload as JSON (machine-readable)                                       |
+| `gitnotes export --format md -o <file>`                     | Write HEAD's notes as a Markdown review (fenced code) — good for sharing a review summary |
+| `gitnotes submit <number> [--github\|--gitlab] [--dry-run]` | Post notes to PR/MR `<number>`                                                            |
+| `gitnotes version`                                          | Print the version                                                                         |
 
 ### Location specs
+
 - `path/to/file.go:14` — a single line
 - `path/to/file.go:1-17` — a block of lines (1 through 17, inclusive)
 - `path/to/file.go` — the whole file (no code captured)
@@ -94,6 +96,7 @@ gitnotes edit -c <sha> 0 -n "…"
 `submit` takes the PR/MR **number** and derives the diff base from it (GitHub's base branch, GitLab's `diff_refs.base_sha`). A note whose lines are **all inside that diff** posts as a **line comment** (ranges post as true multi-line comments); anything else posts as a **general** comment rendered as `location` + blank line + note text.
 
 ## Notes
+
 - `gitnotes` is HEAD/commit-centric, not PR-centric, for storage — the notes live on the commit and are portable via `git notes`.
 - The `submitted` flag (`✓`/`✗` in `list`) makes `submit` idempotent: run it as many times as you like; only new notes are posted.
 - Don't hand-edit `refs/notes/commits` CSV directly — let `gitnotes` read/write it so the format stays consistent.

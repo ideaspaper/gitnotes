@@ -210,24 +210,53 @@ func (a *app) newRemoveCmd() *cobra.Command {
 
 func (a *app) newExportCmd() *cobra.Command {
 	var output string
+	var format string
 	cmd := &cobra.Command{
 		Use:   "export [base]",
-		Short: "Write the review payload as JSON",
+		Short: "Write HEAD's notes as JSON (review payload) or Markdown",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			payload, err := review.NewBuilder(a.git, a.mgr).Build(ctx, firstArg(args))
-			if err != nil {
-				return err
+			switch strings.ToLower(format) {
+			case "json":
+				payload, err := review.NewBuilder(a.git, a.mgr).Build(ctx, firstArg(args))
+				if err != nil {
+					return err
+				}
+				out := output
+				if out == "" {
+					out = "git-notes.json"
+				}
+				if err := review.Export(payload, out); err != nil {
+					return err
+				}
+				fmt.Fprintf(a.out, "Wrote %d comment(s) to %s.\n", len(payload.Comments), out)
+			case "md", "markdown":
+				commit, err := a.git.ShortHash(ctx, "HEAD")
+				if err != nil {
+					return err
+				}
+				entries, err := a.mgr.Read(ctx, commit)
+				if err != nil {
+					return err
+				}
+				subject, _ := a.git.Subject(ctx, commit)
+				out := output
+				if out == "" {
+					out = "git-notes.md"
+				}
+				if err := review.ExportMarkdown(commit, subject, entries, out); err != nil {
+					return err
+				}
+				fmt.Fprintf(a.out, "Wrote %d note(s) to %s.\n", len(entries), out)
+			default:
+				return fmt.Errorf("unknown format %q (use json or md)", format)
 			}
-			if err := review.Export(payload, output); err != nil {
-				return err
-			}
-			fmt.Fprintf(a.out, "Wrote %d comment(s) to %s.\n", len(payload.Comments), output)
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&output, "output", "o", "git-notes.json", "file to write the JSON payload to")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "file to write to (default git-notes.json or git-notes.md)")
+	cmd.Flags().StringVar(&format, "format", "json", "output format: json or md")
 	return cmd
 }
 
