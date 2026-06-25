@@ -53,28 +53,6 @@ func (s *Submitter) Submit(ctx context.Context, opts Options) error {
 	}
 }
 
-func (s *Submitter) SubmitPayload(ctx context.Context, p Payload, opts Options) error {
-	platform, err := s.platform(ctx, opts)
-	if err != nil {
-		return err
-	}
-	if len(p.Comments) == 0 {
-		fmt.Println("No notes to submit.")
-		return nil
-	}
-	switch platform {
-	case GitHub:
-		s.postGitHub(ctx, p, opts.Number, p.Commit, opts.DryRun)
-		return nil
-	case GitLab:
-		refs := diffRefs{BaseSHA: p.BaseSHA, StartSHA: p.BaseSHA, HeadSHA: p.Commit}
-		s.postGitLab(ctx, p, opts.Number, refs, opts.DryRun)
-		return nil
-	default:
-		return fmt.Errorf("unknown platform %q", platform)
-	}
-}
-
 func (s *Submitter) platform(ctx context.Context, opts Options) (Platform, error) {
 	if opts.Platform != "" {
 		return opts.Platform, nil

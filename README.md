@@ -45,17 +45,17 @@ gitnotes version
 
 ## 🚀 Usage
 
-| Command                                                                 | Description                                                    |
-| ----------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `gitnotes add -f <loc> -n <note>`                                       | Add a line / block / whole-file note                           |
-| `gitnotes add -g -n <note>`                                             | Add a general (commit-level) note                              |
-| `gitnotes list`                                                         | Browse notes in a fuzzy-searchable TUI (plain text when piped) |
-| `gitnotes edit [index] [-n <note>]`                                     | Edit a note's text (interactive picker if index omitted)       |
-| `gitnotes remove [index] \| -a`                                         | Remove one note (or all with `-a`)                             |
-| `gitnotes submit <number> [--github\|--gitlab] [-f <file>] [--dry-run]` | Post notes to PR/MR `<number>`                                 |
-| `gitnotes unsubmit [index] \| -a`                                       | Clear a note's `submitted` flag so `submit` posts it again     |
-| `gitnotes export [base] [-o <file>] [--format json\|md]`                | Write the review payload as JSON, or the notes as Markdown     |
-| `gitnotes version`                                                      | Print the version                                              |
+| Command                                                     | Description                                                    |
+| ----------------------------------------------------------- | -------------------------------------------------------------- |
+| `gitnotes add -f <loc> -n <note>`                           | Add a line / block / whole-file note                           |
+| `gitnotes add -g -n <note>`                                 | Add a general (commit-level) note                              |
+| `gitnotes list`                                             | Browse notes in a fuzzy-searchable TUI (plain text when piped) |
+| `gitnotes edit [index] [-n <note>]`                         | Edit a note's text (interactive picker if index omitted)       |
+| `gitnotes remove [index] \| -a`                             | Remove one note (or all with `-a`)                             |
+| `gitnotes submit <number> [--github\|--gitlab] [--dry-run]` | Post notes to PR/MR `<number>`                                 |
+| `gitnotes unsubmit [index] \| -a`                           | Clear a note's `submitted` flag so `submit` posts it again     |
+| `gitnotes export [-o <file>]`                               | Write HEAD's notes as a Markdown review                        |
+| `gitnotes version`                                          | Print the version                                              |
 
 > Commands act on `HEAD` by default. Pass `-c, --commit <commitish>` to target another commit (e.g. `gitnotes edit -c <sha> 1 -n "…"`). This applies to `add`, `list`, `edit`, `remove`, and `unsubmit`; `submit` and `export` always operate on `HEAD`.
 
@@ -109,11 +109,11 @@ The `code` column holds the source captured from the file **as of the commit**; 
 
 Each posted entry is flagged `submitted`, so re-running `submit` skips it (`• … already submitted, skipping`) and only posts new notes — a `--dry-run` never sets the flag, and `unsubmit` clears it.
 
-`submit` auto-detects the platform from the `origin` remote (override with `--github`/`--gitlab`) and shells out to `gh` / `glab`. Use `--dry-run` to print every payload without posting, or `-f <file>` to post a pre-`export`ed JSON. `export` takes an optional `base` argument (default `HEAD^`) for producing a standalone payload.
+`submit` auto-detects the platform from the `origin` remote (override with `--github`/`--gitlab`) and shells out to `gh` / `glab`. Use `--dry-run` to print every payload without posting.
 
 ### 📄 Markdown export
 
-`gitnotes export --format md [-o <file>]` writes HEAD's notes as a readable Markdown review (default `git-notes.md`) — one section per note with its location, the captured code in a fenced block, and the note text:
+`gitnotes export [-o <file>]` writes HEAD's notes as a readable Markdown review (default `git-notes.md`) — one section per note with its location, the captured code in a fenced block, and the note text:
 
 ````markdown
 # Review notes (a1b2c3d — Fix the parser)
@@ -142,7 +142,7 @@ mkdir -p ~/.claude/skills
 cp -r .claude/skills/gitnotes ~/.claude/skills/
 ```
 
-It teaches the agent the **non-interactive** command forms (explicit index, `-n`, reading notes via `list`/`export`), since an agent has no TTY and the interactive picker needs one.
+It teaches the agent the **non-interactive** command forms (explicit index, `-n`, reading notes via `list`), since an agent has no TTY and the interactive picker needs one.
 
 ## 🪪 License
 

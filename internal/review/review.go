@@ -2,9 +2,7 @@ package review
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 
@@ -183,27 +181,4 @@ func splitLines(s string) []string {
 		out = append(out, s[start:])
 	}
 	return out
-}
-
-func Export(p Payload, path string) error {
-	data, err := json.MarshalIndent(p, "", "  ")
-	if err != nil {
-		return fmt.Errorf("encoding payload: %w", err)
-	}
-	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
-		return fmt.Errorf("writing %s: %w", path, err)
-	}
-	return nil
-}
-
-func Load(path string) (Payload, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Payload{}, fmt.Errorf("reading %s: %w", path, err)
-	}
-	var p Payload
-	if err := json.Unmarshal(data, &p); err != nil {
-		return Payload{}, fmt.Errorf("parsing %s: %w", path, err)
-	}
-	return p, nil
 }

@@ -210,59 +210,38 @@ func (a *app) newRemoveCmd() *cobra.Command {
 
 func (a *app) newExportCmd() *cobra.Command {
 	var output string
-	var format string
 	cmd := &cobra.Command{
-		Use:   "export [base]",
-		Short: "Write HEAD's notes as JSON (review payload) or Markdown",
-		Args:  cobra.MaximumNArgs(1),
+		Use:   "export",
+		Short: "Write HEAD's notes as a Markdown review",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
-			switch strings.ToLower(format) {
-			case "json":
-				payload, err := review.NewBuilder(a.git, a.mgr).Build(ctx, firstArg(args))
-				if err != nil {
-					return err
-				}
-				out := output
-				if out == "" {
-					out = "git-notes.json"
-				}
-				if err := review.Export(payload, out); err != nil {
-					return err
-				}
-				fmt.Fprintf(a.out, "Wrote %d comment(s) to %s.\n", len(payload.Comments), out)
-			case "md", "markdown":
-				commit, err := a.git.ShortHash(ctx, "HEAD")
-				if err != nil {
-					return err
-				}
-				entries, err := a.mgr.Read(ctx, commit)
-				if err != nil {
-					return err
-				}
-				subject, _ := a.git.Subject(ctx, commit)
-				out := output
-				if out == "" {
-					out = "git-notes.md"
-				}
-				if err := review.ExportMarkdown(commit, subject, entries, out); err != nil {
-					return err
-				}
-				fmt.Fprintf(a.out, "Wrote %d note(s) to %s.\n", len(entries), out)
-			default:
-				return fmt.Errorf("unknown format %q (use json or md)", format)
+			commit, err := a.git.ShortHash(ctx, "HEAD")
+			if err != nil {
+				return err
 			}
+			entries, err := a.mgr.Read(ctx, commit)
+			if err != nil {
+				return err
+			}
+			subject, _ := a.git.Subject(ctx, commit)
+			out := output
+			if out == "" {
+				out = "git-notes.md"
+			}
+			if err := review.ExportMarkdown(commit, subject, entries, out); err != nil {
+				return err
+			}
+			fmt.Fprintf(a.out, "Wrote %d note(s) to %s.\n", len(entries), out)
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&output, "output", "o", "", "file to write to (default git-notes.json or git-notes.md)")
-	cmd.Flags().StringVar(&format, "format", "json", "output format: json or md")
+	cmd.Flags().StringVarP(&output, "output", "o", "", "file to write the Markdown to (default git-notes.md)")
 	return cmd
 }
 
 func (a *app) newSubmitCmd() *cobra.Command {
 	var (
-		file   string
 		github bool
 		gitlab bool
 		dryRun bool
@@ -286,17 +265,9 @@ func (a *app) newSubmitCmd() *cobra.Command {
 
 			ctx := cmd.Context()
 			sub := review.NewSubmitter(a.git, a.mgr, review.NewBuilder(a.git, a.mgr))
-			if file != "" {
-				payload, err := review.Load(file)
-				if err != nil {
-					return err
-				}
-				return sub.SubmitPayload(ctx, payload, opts)
-			}
 			return sub.Submit(ctx, opts)
 		},
 	}
-	cmd.Flags().StringVarP(&file, "file", "f", "", "post a pre-exported JSON file instead of computing")
 	cmd.Flags().BoolVar(&github, "github", false, "force GitHub (default: detect from origin)")
 	cmd.Flags().BoolVar(&gitlab, "gitlab", false, "force GitLab")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print payloads without posting")
